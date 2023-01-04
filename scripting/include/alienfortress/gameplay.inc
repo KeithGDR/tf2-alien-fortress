@@ -1,7 +1,7 @@
-#if defined _alienfortress_mechanics_included
+#if defined _alienfortress_gameplay_included
 #endinput
 #endif
-#define _alienfortress_mechanics_included
+#define _alienfortress_gameplay_included
 
 //////////////////////////////////////////////
 //Natives
@@ -18,17 +18,17 @@ forward void AlienFortress_OnClientInfected(int client);
 //Info
 
 #if !defined REQUIRE_PLUGIN
-public void __pl_alienfortress_mechanics_SetNTVOptional()
+public void __pl_alienfortress_gameplay_SetNTVOptional()
 {
     MarkNativeAsOptional("AlienFortress_IsClientSurvivor");
     MarkNativeAsOptional("AlienFortress_IsClientAlien");
 }
 #endif
 
-public SharedPlugin __pl_alienfortress_mechanics =
+public SharedPlugin __pl_alienfortress_gameplay =
 {
-    name = "alienfortress_mechanics",
-    file = "alienfortress-mechanics.smx",
+    name = "alienfortress_gameplay",
+    file = "tf2-alienfortress-gameplay.smx",
     #if defined REQUIRE_PLUGIN
     required = 1,
     #else

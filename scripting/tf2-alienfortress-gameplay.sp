@@ -10,14 +10,14 @@
 //Sourcemod Includes
 #include <sourcemod>
 #include <sdkhooks>
+#include <tf2_stocks>
 
 //External Includes
-#include <sourcemod-misc>
-#include <colorvariables>
+#include <misc-colors>
 
 //Our Includes
-#include <alienfortress/alienfortress-core>
-#include <alienfortress/alienfortress-mechanics>
+#include <alienfortress/alienfortress>
+#include <alienfortress/gameplay>
 
 //ConVars
 ConVar convar_Mechanics;
@@ -43,7 +43,7 @@ public Plugin myinfo =
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
-	RegPluginLibrary("alienfortress_mechanics");
+	RegPluginLibrary("alienfortress_gameplay");
 
 	CreateNative("AlienFortress_IsClientSurvivor", Native_IsClientSurvivor);
 	CreateNative("AlienFortress_IsClientAlien", Native_IsClientAlien);
@@ -96,6 +96,8 @@ public Action Timer_RegenerateAliens(Handle timer)
 			SetEntityHealth(i, health);
 		}
 	}
+
+	return Plugin_Continue;
 }
 
 public void OnClientPutInServer(int client)
@@ -105,7 +107,7 @@ public void OnClientPutInServer(int client)
 
 public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
 {
-	if (IsPlayerIndex(attacker) && IsZombie(attacker) && damagecustom == TF_CUSTOM_BACKSTAB)
+	if (attacker > 0 && attacker <= MaxClients && IsZombie(attacker) && damagecustom == TF_CUSTOM_BACKSTAB)
 	{
 		damage = 75.0 / 3.0;
 		return Plugin_Changed;
@@ -122,6 +124,7 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 public Action AlienFortress_GetMaxHealth(int client, int perk, int &maxhealth)
 {
 	g_iMaxHealth[client] = maxhealth;
+	return Plugin_Continue;
 }
 
 public Action Command_EndRound(int client, int args)
@@ -190,10 +193,12 @@ public void Event_OnPlayerDeath(Event event, const char[] name, bool dontBroadca
 
 public Action Timer_CheckForRoundEnd(Handle timer, any data)
 {
-	if (GetTeamAliveClientCount(view_as<int>(GetSurvivorsTeam())) == 0)
+	if (GetTeamAliveCount(view_as<int>(GetSurvivorsTeam())) == 0)
 	{
 		TF2_ForceRoundWin(GetZombiesTeam());
 	}
+
+	return Plugin_Continue;
 }
 
 public void Event_OnRoundStart(Event event, const char[] name, bool dontBroadcast)
@@ -217,7 +222,7 @@ public void Event_OnSetupFinished(Event event, const char[] name, bool dontBroad
 
 	if (GetConVarBool(convar_Mechanics))
 	{
-		int move = GetTeamAliveClientCount(view_as<int>(GetSurvivorsTeam())) / GetConVarInt(convar_Ratio);
+		int move = GetTeamAliveCount(view_as<int>(GetSurvivorsTeam())) / GetConVarInt(convar_Ratio);
 
 		if (move > 0)
 		{
@@ -328,4 +333,78 @@ TFTeam GetSurvivorsTeam()
 TFTeam GetZombiesTeam()
 {
 	return view_as<TFTeam>(GetConVarInt(convar_MainTeam) == 2 ? 3 : 2);
+}
+
+any ClampCell(any value, any min, any max) {
+	if (value < min) {
+		value = min;
+	}
+
+	if (value > max) {
+		value = max;
+	}
+
+	return value;
+}
+
+void TF2_ForceRoundWin(TFTeam team = TFTeam_Unassigned) {
+	//Need to make sure the world exists in order for entities to be created.
+	if (!IsValidEntity(0)) {
+		return;
+	}
+	
+	int entity = FindEntityByClassname(-1, "team_control_point_master");
+
+	if (!IsValidEntity(entity)) {
+		entity = CreateEntityByName("team_control_point_master");
+		DispatchSpawn(entity);
+		AcceptEntityInput(entity, "Enable");
+	}
+
+	SetVariantInt(view_as<int>(team));
+	AcceptEntityInput(entity, "SetWinner");
+}
+
+void TF2_StripToMelee(int client) {
+	TF2_RemoveWeaponSlot(client, TFWeaponSlot_Primary);
+	TF2_RemoveWeaponSlot(client, TFWeaponSlot_Secondary);
+	TF2_RemoveWeaponSlot(client, TFWeaponSlot_Grenade);
+	TF2_RemoveWeaponSlot(client, TFWeaponSlot_Building);
+	TF2_RemoveWeaponSlot(client, TFWeaponSlot_PDA);
+	TF2_RemoveWeaponSlot(client, TFWeaponSlot_Item1);
+	TF2_RemoveWeaponSlot(client, TFWeaponSlot_Item2);
+
+	int melee;
+	if ((melee = GetPlayerWeaponSlot(client, TFWeaponSlot_Melee)) != -1) {
+		EquipPlayerWeapon(client, melee);
+	}
+}
+
+int GetTeamAliveCount(int team) {
+	int count;
+
+	for (int i = 1; i <= MaxClients; i++) {
+		if (!IsClientInGame(i) || IsClientSourceTV(i) || !IsPlayerAlive(i) || GetClientTeam(i) != team) {
+			continue;
+		}
+
+		count++;
+	}
+
+	return count;
+}
+
+int GetRandomClient(bool ingame = true, bool alive = false, bool fake = false, int team = 0) {
+	int[] clients = new int[MaxClients];
+	int amount;
+
+	for (int i = 1; i <= MaxClients; i++) {
+		if (ingame && !IsClientInGame(i) || alive && !IsPlayerAlive(i) || !fake && IsFakeClient(i) || team > 0 && team != GetClientTeam(i)) {
+			continue;
+		}
+
+		clients[amount++] = i;
+	}
+
+	return (amount == 0) ? -1 : clients[GetRandomInt(0, amount - 1)];
 }

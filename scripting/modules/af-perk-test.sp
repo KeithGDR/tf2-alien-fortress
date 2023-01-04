@@ -15,8 +15,7 @@
 #include <sourcemod>
 
 //External Includes
-#include <sourcemod-misc>
-#include <colorvariables>
+#include <misc-colors>
 
 //Our Includes
 #include <alienfortress/alienfortress-core>

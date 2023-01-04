@@ -16,8 +16,7 @@
 #include <sdkhooks>
 
 //External Includes
-#include <sourcemod-misc>
-#include <colorvariables>
+#include <misc-colors>
 #include <tf2attributes>
 
 //Our Includes

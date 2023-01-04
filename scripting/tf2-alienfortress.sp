@@ -18,13 +18,12 @@
 #include <tf2_stocks>
 
 //External Includes
-#include <sourcemod-misc>
-#include <colorvariables>
+#include <misc-colors>
 #include <tf2attributes>
 
 //Our Includes
-#include <alienfortress/alienfortress-core>
-#include <alienfortress/alienfortress-mechanics>
+#include <alienfortress/alienfortress>
+#include <alienfortress/gameplay>
 
 //ConVars
 ConVar convar_ChangePerkAtSpawn;
@@ -44,9 +43,9 @@ ArrayList g_hArray_PerksList;
 StringMap g_hTrie_PerkTeams;
 StringMap g_hTrie_PerkFunctions;
 
-int g_iCurrentPerk[MAXPLAYERS + 1][TFTeam];
-int g_iQueuedPerk[MAXPLAYERS + 1][TFTeam];
-int g_iPerkCooldown[MAXPLAYERS + 1][TFTeam];
+int g_iCurrentPerk[MAXPLAYERS + 1][4];
+int g_iQueuedPerk[MAXPLAYERS + 1][4];
+int g_iPerkCooldown[MAXPLAYERS + 1][4];
 bool g_bIsInRespawnZone[MAXPLAYERS + 1];
 
 //Plugin Info
@@ -61,7 +60,7 @@ public Plugin myinfo =
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
-	RegPluginLibrary("alienfortress_core");
+	RegPluginLibrary("alienfortress");
 
 	CreateNative("AlienFortress_RegisterPerk", Native_RegisterPerk);
 	CreateNative("AlienFortress_UnregisterPerk", Native_UnregisterPerk);
@@ -114,8 +113,8 @@ public void OnConfigsExecuted()
 			}
 		}
 
-		int entity = INVALID_ENT_INDEX;
-		while ((entity = FindEntityByClassname(entity, "*")) != INVALID_ENT_INDEX)
+		int entity = -1;
+		while ((entity = FindEntityByClassname(entity, "*")) != -1)
 		{
 			char sClassname[64];
 			GetEntityClassname(entity, sClassname, sizeof(sClassname));
@@ -195,11 +194,11 @@ public Action Hook_OnTakeDamage(int victim, int &attacker, int &inflictor, float
 
 	Call_StartForward(g_hForward_OnTakeDamage);
 	Call_PushCell(victim);
-	Call_PushCell(IsPlayerIndex(victim) ? AlienFortress_GetClientPerk(victim, TF2_GetClientTeam(victim)) : INVALID_PERK_ID);
+	Call_PushCell((victim > 0) ? AlienFortress_GetClientPerk(victim, TF2_GetClientTeam(victim)) : INVALID_PERK_ID);
 	Call_PushCellRef(attacker);
-	Call_PushCell(IsPlayerIndex(attacker) ? AlienFortress_GetClientPerk(attacker, TF2_GetClientTeam(attacker)) : INVALID_PERK_ID);
+	Call_PushCell((attacker > 0) ? AlienFortress_GetClientPerk(attacker, TF2_GetClientTeam(attacker)) : INVALID_PERK_ID);
 	Call_PushCellRef(inflictor);
-	Call_PushCell(IsPlayerIndex(inflictor) ? AlienFortress_GetClientPerk(inflictor, TF2_GetClientTeam(inflictor)) : INVALID_PERK_ID);
+	Call_PushCell((inflictor > 0) ? AlienFortress_GetClientPerk(inflictor, TF2_GetClientTeam(inflictor)) : INVALID_PERK_ID);
 	Call_PushFloatRef(damage);
 	Call_PushCellRef(damagetype);
 	Call_PushCellRef(weapon);
@@ -215,11 +214,11 @@ public void Hook_OnTakeDamagePost(int victim, int attacker, int inflictor, float
 {
 	Call_StartForward(g_hForward_OnTakeDamage_Post);
 	Call_PushCell(victim);
-	Call_PushCell(IsPlayerIndex(victim) ? AlienFortress_GetClientPerk(victim, TF2_GetClientTeam(victim)) : INVALID_PERK_ID);
+	Call_PushCell((victim > 0) ? AlienFortress_GetClientPerk(victim, TF2_GetClientTeam(victim)) : INVALID_PERK_ID);
 	Call_PushCell(attacker);
-	Call_PushCell(IsPlayerIndex(attacker) ? AlienFortress_GetClientPerk(attacker, TF2_GetClientTeam(attacker)) : INVALID_PERK_ID);
+	Call_PushCell((attacker > 0) ? AlienFortress_GetClientPerk(attacker, TF2_GetClientTeam(attacker)) : INVALID_PERK_ID);
 	Call_PushCell(inflictor);
-	Call_PushCell(IsPlayerIndex(inflictor) ? AlienFortress_GetClientPerk(inflictor, TF2_GetClientTeam(inflictor)) : INVALID_PERK_ID);
+	Call_PushCell((inflictor > 0) ? AlienFortress_GetClientPerk(inflictor, TF2_GetClientTeam(inflictor)) : INVALID_PERK_ID);
 	Call_PushFloat(damage);
 	Call_PushCell(damagetype);
 	Call_PushCell(weapon);
@@ -235,7 +234,7 @@ public Action Hook_GetMaxHealth(int entity, int &maxhealth)
 
 	Call_StartForward(g_hForward_GetMaxHealth);
 	Call_PushCell(entity);
-	Call_PushCell(IsPlayerIndex(entity) ? AlienFortress_GetClientPerk(entity, TF2_GetClientTeam(entity)) : INVALID_PERK_ID);
+	Call_PushCell((entity > 0) ? AlienFortress_GetClientPerk(entity, TF2_GetClientTeam(entity)) : INVALID_PERK_ID);
 	Call_PushCellRef(maxhealth);
 	Call_Finish(results);
 
@@ -253,7 +252,7 @@ public void OnEntityCreated(int entity, const char[] classname)
 
 public void OnRespawnRoomStartTouch(int entity, int other)
 {
-	if (IsPlayerIndex(other))
+	if (other > 0)
 	{
 		g_bIsInRespawnZone[other] = true;
 	}
@@ -261,7 +260,7 @@ public void OnRespawnRoomStartTouch(int entity, int other)
 
 public void OnRespawnRoomEndTouch(int entity, int other)
 {
-	if (IsPlayerIndex(other))
+	if (other > 0)
 	{
 		g_bIsInRespawnZone[other] = false;
 	}
@@ -320,20 +319,18 @@ public void Event_OnPlayerTeam(Event event, const char[] name, bool dontBroadcas
 
 public void Event_OnPlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
-	int userid = GetEventInt(event, "userid");
-	int client = GetClientOfUserId(userid);
+	int client = GetClientOfUserId(event.GetInt("userid"));
 
-	if (!IsPlayerIndex(client) || !IsClientInGame(client) || IsFakeClient(client))
+	if (IsFakeClient(client))
 	{
 		return;
 	}
 
-	int attacker_userid = GetEventInt(event, "attacker");
-	int attacker_client = GetClientOfUserId(attacker_userid);
+	int attacker = GetClientOfUserId(event.GetInt("attacker"));
 
 	TFTeam team = TF2_GetClientTeam(client);
 
-	ExecutePerkFunction(client, g_iCurrentPerk[client][team], FUNCTION_PERK_ONDIEWITHPERK, attacker_client);
+	ExecutePerkFunction(client, g_iCurrentPerk[client][team], FUNCTION_PERK_ONDIEWITHPERK, attacker);
 }
 
 public void Event_OnArenaRoundStart(Event event, const char[] name, bool dontBroadcast)
@@ -475,6 +472,8 @@ public int MenuHandler_ShowMainMenu(Menu menu, MenuAction action, int param1, in
 			CloseHandle(menu);
 		}
 	}
+
+	return 0;
 }
 
 /*-------------------------------------------------------*/
@@ -520,8 +519,8 @@ void ShowPerksMenu(int client, TFTeam team, bool equip = false)
 		AddMenuItem(menu, "", "[No Perks Available]", ITEMDRAW_DISABLED);
 	}
 
-	PushMenuCell(menu, "team", view_as<int>(team));
-	PushMenuCell(menu, "equip", equip);
+	PushMenuInt(menu, "team", view_as<int>(team));
+	PushMenuInt(menu, "equip", equip);
 
 	DisplayMenu(menu, client, MENU_TIME_FOREVER);
 }
@@ -535,8 +534,8 @@ public int MenuHandler_ShowPerksMenu(Menu menu, MenuAction action, int param1, i
 			char sPerkID[12]; char sPerkName[MAX_PERK_NAME_LENGTH];
 			GetMenuItem(menu, param2, sPerkID, sizeof(sPerkID), _, sPerkName, sizeof(sPerkName));
 
-			TFTeam team = view_as<TFTeam>(GetMenuCell(menu, "team"));
-			bool equip = view_as<bool>(GetMenuCell(menu, "equip"));
+			TFTeam team = view_as<TFTeam>(GetMenuInt(menu, "team"));
+			bool equip = view_as<bool>(GetMenuInt(menu, "equip"));
 			int perk = StringToInt(sPerkID);
 
 			char sTeam[32];
@@ -548,7 +547,7 @@ public int MenuHandler_ShowPerksMenu(Menu menu, MenuAction action, int param1, i
 				{
 					PrintToChat(param1, "You cannot change your perk inside of a spawn area.");
 					ShowPerksMenu(param1, team, equip);
-					return;
+					return 0;
 				}
 
 				if (GetConVarBool(convar_ChangePerkOnRespawn))
@@ -562,7 +561,7 @@ public int MenuHandler_ShowPerksMenu(Menu menu, MenuAction action, int param1, i
 					{
 						PrintToChat(param1, "Please wait a couple seconds before switching perks again for the %s.", sTeam);
 						ShowPerksMenu(param1, team, equip);
-						return;
+						return 0;
 					}
 
 					g_iPerkCooldown[param1][team] = GetTime();
@@ -589,6 +588,8 @@ public int MenuHandler_ShowPerksMenu(Menu menu, MenuAction action, int param1, i
 			CloseHandle(menu);
 		}
 	}
+
+	return 0;
 }
 
 /*-------------------------------------------------------*/
@@ -639,6 +640,8 @@ public int MenuHandler_ShowClassInfoMenu(Menu menu, MenuAction action, int param
 			CloseHandle(menu);
 		}
 	}
+
+	return 0;
 }
 
 /*-------------------------------------------------------*/
@@ -675,7 +678,7 @@ void ShowClassInfoMenuClasses(int client, TFTeam team)
 		}
 	}
 
-	PushMenuCell(menu, "team", view_as<int>(team));
+	PushMenuInt(menu, "team", view_as<int>(team));
 
 	DisplayMenu(menu, client, MENU_TIME_FOREVER);
 }
@@ -689,13 +692,15 @@ public int MenuHandler_ShowClassInfoClassesMenu(Menu menu, MenuAction action, in
 			char sInfo[12];
 			GetMenuItem(menu, param2, sInfo, sizeof(sInfo));
 
-			ShowClassInfoPanel(param1, view_as<TFTeam>(GetMenuCell(menu, "team")), view_as<TFClassType>(StringToInt(sInfo)));
+			ShowClassInfoPanel(param1, view_as<TFTeam>(GetMenuInt(menu, "team")), view_as<TFClassType>(StringToInt(sInfo)));
 		}
 		case MenuAction_End:
 		{
 			CloseHandle(menu);
 		}
 	}
+
+	return 0;
 }
 
 /*-------------------------------------------------------*/
@@ -765,6 +770,8 @@ public int MenuHandler_ShowClassInfoPanel(Menu menu, MenuAction action, int para
 			CloseHandle(menu);
 		}
 	}
+
+	return 0;
 }
 
 /*-------------------------------------------------------*/
@@ -960,8 +967,9 @@ public Action Timer_DelayReequip(Handle timer, any data)
 	{
 		ExecutePerkFunction(client, g_iCurrentPerk[client][team], FUNCTION_PERK_ONPERKEQUIP);
 	}
-}
 
+	return Plugin_Continue;
+}
 
 /*-------------------------------------------------------*/
 //	Natives
@@ -996,4 +1004,70 @@ public int Native_GetClientPerk(Handle plugin, int numParams)
 	TFTeam team = view_as<TFTeam>(GetNativeCell(2));
 
 	return g_iCurrentPerk[client][team];
+}
+
+bool PushMenuInt(Menu menu, const char[] id, int value) {
+	if (menu == null || strlen(id) == 0) {
+		return false;
+	}
+	
+	char sBuffer[128];
+	IntToString(value, sBuffer, sizeof(sBuffer));
+	return menu.AddItem(id, sBuffer, ITEMDRAW_IGNORE);
+}
+
+int GetMenuInt(Menu menu, const char[] id, int defaultvalue = 0) {
+	if (menu == null || strlen(id) == 0) {
+		return defaultvalue;
+	}
+	
+	char info[128]; char data[128];
+	for (int i = 0; i < menu.ItemCount; i++) {
+		if (menu.GetItem(i, info, sizeof(info), _, data, sizeof(data)) && StrEqual(info, id)) {
+			return StringToInt(data);
+		}
+	}
+	
+	return defaultvalue;
+}
+
+void TF2_GetClassName(TFClassType class, char[] buffer, int size, bool capitalize = false) {
+	switch (class) {
+		case TFClass_Unknown: {
+			strcopy(buffer, size, "unknown");
+		}
+		case TFClass_Scout: {
+			strcopy(buffer, size, "scout");
+		}
+		case TFClass_Sniper: {
+			strcopy(buffer, size, "sniper");
+		}
+		case TFClass_Soldier: {
+			strcopy(buffer, size, "soldier");
+		}
+		case TFClass_DemoMan: {
+			strcopy(buffer, size, "demoman");
+		}
+		case TFClass_Medic: {
+			strcopy(buffer, size, "medic");
+		}
+		case TFClass_Heavy: {
+			strcopy(buffer, size, "heavy");
+		}
+		case TFClass_Pyro: {
+			strcopy(buffer, size, "pyro");
+		}
+		case TFClass_Spy: {
+			strcopy(buffer, size, "spy");
+		}
+		case TFClass_Engineer: {
+			strcopy(buffer, size, "engineer");
+		}
+	}
+
+	if (capitalize) {
+		buffer[0] = CharToUpper(buffer[0]);
+	} else {
+		buffer[0] = CharToLower(buffer[0]);
+	}
 }

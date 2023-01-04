@@ -8,7 +8,7 @@
 #define PLUGIN_VERSION "1.0.0"
 
 //Perk Defines
-#define AF_PERK_NAME	"Athletic"
+#define AF_PERK_NAME	"Berserker"
 #define AF_PERK_TEAM	SURVIVOR_TEAM
 
 //Sourcemod Includes
@@ -16,8 +16,7 @@
 #include <tf2_stocks>
 
 //External Includes
-#include <sourcemod-misc>
-#include <colorvariables>
+#include <misc-colors>
 #include <tf2attributes>
 
 //Our Includes
@@ -25,51 +24,35 @@
 
 //ConVars
 ConVar convar_Status;
+ConVar convar_Stat_DamageBonus;
 ConVar convar_Stat_SpeedBonus;
-ConVar convar_Stat_DamagePenalty;
 ConVar convar_Stat_ROFBonus;
 
 //Globals
-bool g_bLate;
 int g_iPerkID = INVALID_PERK_ID;
 
 //Plugin Info
 public Plugin myinfo =
 {
-	name = "[TF2] Alien Fortress Perk: Athletic",
+	name = "[TF2] Alien Fortress Perk: Berserker",
 	author = "Drixevel",
 	description = PLUGIN_DESCRIPTION,
 	version = PLUGIN_VERSION,
 	url = "https://drixevel.dev/"
 };
 
-public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
-{
-	g_bLate = late;
-	return APLRes_Success;
-}
-
 public void OnPluginStart()
 {
 	LoadTranslations("common.phrases");
 
-	convar_Status = CreateConVar("sm_af_perk_survivors_athletic_status", "1", "Status of the plugin.\n(1 = on, 0 = off)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	convar_Stat_SpeedBonus = CreateConVar("sm_af_perk_survivors_athletic_stat_speedbonus", "1.75", "Stat for a custom perk for Alien Fortress.", FCVAR_NOTIFY);
-	convar_Stat_DamagePenalty = CreateConVar("sm_af_perk_survivors_athletic_stat_damagepenalty", "0.8", "Stat for a custom perk for Alien Fortress.", FCVAR_NOTIFY);
-	convar_Stat_ROFBonus = CreateConVar("sm_af_perk_survivors_athletic_stat_rofbonus", "0.25", "Stat for a custom perk for Alien Fortress.", FCVAR_NOTIFY);
+	convar_Status = CreateConVar("sm_af_perk_survivors_berserker_status", "1", "Status of the plugin.\n(1 = on, 0 = off)", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	convar_Stat_DamageBonus = CreateConVar("sm_af_perk_survivors_berserker_stat_damagebonus", "0.30", "Stat for a custom perk for Alien Fortress.", FCVAR_NOTIFY);
+	convar_Stat_SpeedBonus = CreateConVar("sm_af_perk_survivors_berserker_stat_speedbonus", "0.30", "Stat for a custom perk for Alien Fortress.", FCVAR_NOTIFY);
+	convar_Stat_ROFBonus = CreateConVar("sm_af_perk_survivors_berserker_stat_rofbonus", "0.30", "Stat for a custom perk for Alien Fortress.", FCVAR_NOTIFY);
 
+	HookConVarChange(convar_Stat_DamageBonus, OnConVarChanged_OnStatChange);
 	HookConVarChange(convar_Stat_SpeedBonus, OnConVarChanged_OnStatChange);
-	HookConVarChange(convar_Stat_DamagePenalty, OnConVarChanged_OnStatChange);
 	HookConVarChange(convar_Stat_ROFBonus, OnConVarChanged_OnStatChange);
-}
-
-public void OnConfigsExecuted()
-{
-	if (g_bLate)
-	{
-		AlienFortress_OnRegisteringPerks();
-		g_bLate = false;
-	}
 }
 
 public void OnPluginEnd()
@@ -117,10 +100,9 @@ public void OnPerkEquip(int client, int perk, bool alive)
 {
 	if (alive)
 	{
+		TF2_AddCondition(client, TFCond_RestrictToMelee, TFCondDuration_Infinite, client);
+		TF2Attrib_SetByName_Weapons(client, -1, "damage bonus", GetConVarFloat(convar_Stat_DamageBonus), true);
 		TF2Attrib_ApplyMoveSpeedBonus(client, GetConVarFloat(convar_Stat_SpeedBonus));
-
-		TF2Attrib_SetByName(client, "damage penalty", GetConVarFloat(convar_Stat_DamagePenalty));
-
 		TF2Attrib_SetByName_Weapons(client, -1, "fire rate bonus", GetConVarFloat(convar_Stat_ROFBonus));
 	}
 }
@@ -129,29 +111,26 @@ public void OnPerkUnequip(int client, int perk, bool disconnect)
 {
 	if (!disconnect)
 	{
+		TF2_RemoveCondition(client, TFCond_RestrictToMelee);
+		TF2Attrib_RemoveByName_Weapons(client, -1, "damage bonus");
 		TF2Attrib_RemoveMoveSpeedBonus(client);
-
-		TF2Attrib_RemoveByName(client, "damage penalty");
-
 		TF2Attrib_RemoveByName_Weapons(client, -1, "fire rate bonus");
 	}
 }
 
 public void OnSpawnWithPerk(int client, int perk)
 {
+	TF2_AddCondition(client, TFCond_RestrictToMelee, TFCondDuration_Infinite, client);
+	TF2Attrib_SetByName_Weapons(client, -1, "damage bonus", GetConVarFloat(convar_Stat_DamageBonus), true);
 	TF2Attrib_ApplyMoveSpeedBonus(client, GetConVarFloat(convar_Stat_SpeedBonus));
-
-	TF2Attrib_SetByName(client, "damage penalty", GetConVarFloat(convar_Stat_DamagePenalty));
-
 	TF2Attrib_SetByName_Weapons(client, -1, "fire rate bonus", GetConVarFloat(convar_Stat_ROFBonus));
 }
 
 public void OnDieWithPerk(int client, int perk, int attacker)
 {
+	TF2_RemoveCondition(client, TFCond_RestrictToMelee);
+	TF2Attrib_RemoveByName_Weapons(client, -1, "damage bonus");
 	TF2Attrib_RemoveMoveSpeedBonus(client);
-
-	TF2Attrib_RemoveByName(client, "damage penalty");
-
 	TF2Attrib_RemoveByName_Weapons(client, -1, "fire rate bonus");
 }
 

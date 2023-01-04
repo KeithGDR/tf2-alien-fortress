@@ -1,7 +1,7 @@
-#if defined _alienfortress_core_included
+#if defined _alienfortress_included
 #endinput
 #endif
-#define _alienfortress_core_included
+#define _alienfortress_included
 
 //////////////////////////////////////////////
 //Globals/Defines
@@ -53,7 +53,7 @@ stock void GetAlienFortressTeamNames(TFTeam team, char[] buffer, int size)
 //Info
 
 #if !defined REQUIRE_PLUGIN
-public void __pl_alienfortress_core_SetNTVOptional()
+public void __pl_alienfortress_SetNTVOptional()
 {
     MarkNativeAsOptional("AlienFortress_RegisterPerk");
     MarkNativeAsOptional("AlienFortress_UnregisterPerk");
@@ -61,10 +61,10 @@ public void __pl_alienfortress_core_SetNTVOptional()
 }
 #endif
 
-public SharedPlugin __pl_alienfortress_core =
+public SharedPlugin __pl_alienfortress =
 {
-    name = "alienfortress_core",
-    file = "alienfortress-core.smx",
+    name = "alienfortress",
+    file = "tf2-alienfortress.smx",
     #if defined REQUIRE_PLUGIN
     required = 1,
     #else
